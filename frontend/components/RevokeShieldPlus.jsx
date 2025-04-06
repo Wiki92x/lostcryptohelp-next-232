@@ -1,13 +1,19 @@
-// RevokeShieldPlus.jsx – Pro Chain Selector UI
+// RevokeShieldPlus.jsx – Now With Metamask Revoke Support
 import React, { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { SiEthereum, SiBinance, SiTron } from "react-icons/si";
+import { ethers } from "ethers";
+
+const ERC20_ABI = [
+  "function approve(address spender, uint256 amount) external returns (bool)"
+];
 
 export default function RevokeShieldPlus() {
   const [walletsInput, setWalletsInput] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [chain, setChain] = useState("ETH");
+  const [txStatus, setTxStatus] = useState(null);
 
   const parseWallets = () => {
     return walletsInput
@@ -38,6 +44,23 @@ export default function RevokeShieldPlus() {
 
     setResults(scanned);
     setLoading(false);
+  };
+
+  const handleRevoke = async (tokenAddress, spender) => {
+    try {
+      if (!window.ethereum) return alert("Please connect Metamask");
+      setTxStatus("pending");
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const contract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+      const tx = await contract.approve(spender, 0);
+      await tx.wait();
+      setTxStatus("success");
+    } catch (e) {
+      console.error(e);
+      setTxStatus("error");
+    }
   };
 
   return (
@@ -115,7 +138,7 @@ export default function RevokeShieldPlus() {
                     </div>
                     <button
                       className="mt-2 sm:mt-0 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md text-white text-sm"
-                      onClick={() => alert(`Would revoke ${a.token} from ${a.spender}`)}
+                      onClick={() => handleRevoke(a.tokenAddress, a.spender)}
                     >
                       Revoke Access
                     </button>
@@ -123,6 +146,9 @@ export default function RevokeShieldPlus() {
                 ))}
               </ul>
             )}
+            {txStatus === "pending" && <p className="text-yellow-400 mt-2">⏳ Transaction pending...</p>}
+            {txStatus === "success" && <p className="text-green-400 mt-2">✅ Revoked successfully!</p>}
+            {txStatus === "error" && <p className="text-red-400 mt-2">❌ Revoke failed. Try again.</p>}
           </div>
         ))}
       </div>
